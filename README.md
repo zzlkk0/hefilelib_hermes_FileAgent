@@ -86,18 +86,18 @@ Every file lives in a **semantically meaningful folder**, not a random hash dire
 ```
 FileVault/
 ├── 生活/           ← Lifestyle: travel, food, daily moments
-│   ├── 飞机窗景_云海.jpg
-│   ├── 携程酒店_大连宜客宜家.jpg
-│   └── 饺子大餐_红油.jpg
-├── 财务/           ← Finance: stocks, trading, banking
-│   └── 股票持仓_Portfolio.jpg
-├── 学习/           ← Learning: circuits, CAD, research
-│   ├── BCD电路_Deeds仿真.png
-│   ├── BCD电路_Deeds仿真_2.jpg
-│   └── WALLE_CAD模型.jpg
+│   ├── 窗景_云海.jpg
+│   ├── 酒店预订_确认页.jpg
+│   └── 家庭聚餐_美食.jpg
+├── 财务/           ← Finance: receipts, invoices, banking
+│   └── 银行转账_凭证.jpg
+├── 学习/           ← Learning: notes, diagrams, research
+│   ├── 数字电路_仿真实验.png
+│   ├── 数字电路_仿真实验_2.jpg
+│   └── 机器人_CAD建模.jpg
 ├── _sensitive/     ← 🔒 Sensitive: IDs, signatures, contracts
-│   ├── 保密声明_澳大AMSV_第1页.jpg
-│   └── 保密声明_澳大AMSV_第2页.jpg
+│   ├── 保密协议_第1页.jpg
+│   └── 保密协议_第2页.jpg
 ├── _inbox/         ← Incoming, unclassified
 ├── .meta.db        ← File metadata + descriptions
 └── .categories.db  ← Category key-value store
@@ -171,10 +171,10 @@ This is the most powerful piece. Every file and folder has a row:
 
 ```
 path: 生活/飞机窗景_云海.jpg
-desc: 高空飞行窗景：山东航空客机舷窗拍摄，白色云海与深蓝天空，机翼清晰可见，明亮开阔的旅行风景
+desc: 高空飞行窗景：客机舷窗外拍摄，白色云海与深蓝天空，机翼清晰可见，明亮开阔的旅行风景
 
 path: 生活
-desc: 生活日常类：旅行、餐饮、购物、家庭、社交活动照片
+desc: 生活日常类：旅行、餐饮、购物、家庭活动照片
 ```
 
 Now `search_descriptions("风景")` finds the airplane photo, and `search_descriptions("文件夹 日常")` finds the 生活 folder. **Folders are first-class searchable entities.**
@@ -197,7 +197,7 @@ Image arrives
     ├─ 1. Telegram auto-description (FREE, zero latency)
     │      Telegram generates a detailed description of every photo.
     │      It's already in the message context when the agent receives it.
-    │      Example: "a stock portfolio screenshot showing 8 positions..."
+    │      Example: "a hotel booking confirmation showing reservation details..."
     │      ✓ Used 95% of the time — zero API cost, instant.
     │
     ├─ 2. vision_analyze (fallback: auxiliary vision model)
@@ -220,7 +220,7 @@ Based on the visual evidence, this is a photograph of 8 只股票持仓截图
 including NVDA, INTC, NOK, BB...]
 ```
 
-The `classify` tool extracts keywords from this text: `股票`, `持仓`, `NVDA`, `INTC`, `portfolio`, `trading` → scores highest against `财务` (finance) → moves to `FileVault/财务/股票持仓_Portfolio.jpg`.
+The `classify` tool extracts keywords from this text: `酒店`, `预订`, `booking`, `reservation`, `travel` → scores highest against `生活` (lifestyle) → moves to `FileVault/生活/酒店预订_确认页.jpg`.
 
 **Total cost: $0. No vision API call needed.**
 
@@ -357,10 +357,10 @@ The agent **doesn't need you to specify each step.** It chains the tools:
 
 ```
 1. extract_text(file) → "stock portfolio with NVDA, INTC..."
-2. classify_file(keywords) → {category: "财务", confidence: 0.82}
-3. organize_file(file, "财务", descriptive_name) → moves to 财务/股票持仓.jpg
+2. classify_file(keywords) → {category: "生活", confidence: 0.82}
+3. organize_file(file, "生活", descriptive_name) → moves to 生活/窗景_云海.jpg
 4. describe(file, auto_generated_description) → saves to FTS5 index
-5. Report back: "已归档到 财务/股票持仓_Portfolio.jpg ✅"
+5. Report back: "已归档到 生活/窗景_云海.jpg ✅"
 ```
 
 All you see is the result. The MCP tools handle the complexity.
@@ -513,20 +513,19 @@ Restart Hermes, and the 30 MCP tools become available in conversation.
 ```
 You: 帮我整理桌面上这些文件
 Agent:
-  ✓ BCD电路_Deeds仿真.png → 学习
-  ✓ 饺子大餐_红油.jpg → 生活
-  ✓ 股票持仓_Portfolio.jpg → 财务
+  ✓ 数字电路_仿真实验.png → 学习
+  ✓ 家庭聚餐_美食.jpg → 生活
+  ✓ 银行转账_凭证.jpg → 财务
   全部归类完成! 3/3 成功
 
-You: 找一下股票相关的文件
+You: 找一下酒店相关的文件
 Agent:
-  🔍 搜索"股票":
-  财务/股票持仓_Portfolio.jpg — 手机股票APP截图：8只持仓含NVDA、INTC...
+  🔍 搜索"酒店":
+  生活/酒店预订_确认页.jpg — 酒店预订确认页面：含入住日期、房型选择和价格信息
 
 You: 这个文件是什么
 Agent: [reads description from FTS5]
-  WALLE_CAD模型.jpg — WALL-E机器人SolidWorks三维CAD模型截图，
-  含坐标轴和特征树，机械工程设计
+  机器人_CAD建模.jpg — 三维CAD模型建模截图，含坐标轴和特征树，机械工程设计
 
 You: 帮我打开仪表板
 Agent: [starts dashboard on :8765]
@@ -545,8 +544,8 @@ Agent: [calls record_correction]
 from file_manager.classify import classify_keywords, record_correction
 
 # Classify
-result = classify_keywords(["stock", "NVDA", "portfolio", "股票"])
-# → {"category": "财务", "confidence": 0.82, "matched": ["stock", "股票", ...]}
+result = classify_keywords(["hotel", "booking", "reservation", "酒店"])
+# → {"category": "生活", "confidence": 0.82, "matched": ["hotel", "酒店", ...]}
 
 # Correct a mistake
 record_correction(
@@ -567,11 +566,11 @@ We discovered this accidentally. Telegram generates surprisingly detailed image 
 
 ### 2. Dynamic categories beat hardcoded rules
 
-The first version had 5 hardcoded categories with fixed keyword lists. It broke immediately when the user sent a "WALL-E CAD model" — no category matched well. Switching to SQLite-backed dynamic categories with weighted keywords meant the system could evolve. After processing just 7 files, it had learned 30+ keywords across 3 categories, and classification accuracy went from ~60% to >90%.
+The first version had 5 hardcoded categories with fixed keyword lists. It broke immediately when a user sent a "robot CAD model" — no category matched well. Switching to SQLite-backed dynamic categories with weighted keywords meant the system could evolve. After processing just 7 files, it had learned 30+ keywords across 3 categories, and classification accuracy went from ~60% to >90%.
 
 ### 3. FTS5 makes descriptions a search engine
 
-Storing descriptions in FTS5 rather than a plain `TEXT` column was the right call. Boolean queries (`澳门 AND 保密`), prefix searches (`circ*`), and phrase matching (`"股票持仓"`) all work out of the box. The 13 descriptions we wrote take up ~2KB but enable Google-quality search over the entire vault.
+Storing descriptions in FTS5 rather than a plain `TEXT` column was the right call. Boolean queries (`旅行 AND 酒店`), prefix searches (`circ*`), and phrase matching (`"仿真实验"`) all work out of the box. The 13 descriptions we wrote take up ~2KB but enable Google-quality search over the entire vault.
 
 ### 4. MCP tools are the right abstraction
 
