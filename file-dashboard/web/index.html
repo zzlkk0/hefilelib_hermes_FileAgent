@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📊 FileVault Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242734;
+  --border: #2a2d3a;
+  --text: #e1e4ed;
+  --text2: #8b8fa3;
+  --accent: #6c8cff;
+  --accent2: #4ade80;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --radius: 10px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* Layout */
+.app { display: flex; height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 220px; background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 16px; display: flex; flex-direction: column; gap: 8px;
+  flex-shrink: 0; position: relative;
+}
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.sidebar-header h2 { font-size: 16px; color: var(--accent); }
+.logout-btn {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px;
+  transition: all 0.2s;
+}
+.logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+.search-box {
+  width: 100%; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); font-size: 13px; outline: none;
+}
+.search-box:focus { border-color: var(--accent); }
+.cat-item {
+  padding: 8px 12px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; display: flex; justify-content: space-between;
+  transition: background 0.2s; border: 1px solid transparent;
+}
+.cat-item:hover { background: var(--surface2); }
+.cat-item.active { background: var(--surface2); border-color: var(--accent); }
+.cat-item .count { color: var(--text2); font-size: 11px; }
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Stats Bar */
+.stats-bar {
+  display: flex; gap: 16px; padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.stat-card {
+  flex: 1; background: var(--surface); border-radius: var(--radius);
+  padding: 14px 18px; border: 1px solid var(--border);
+}
+.stat-card .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+.stat-card .value.accent { color: var(--accent); }
+.stat-card .value.green { color: var(--accent2); }
+.stat-card .value.warn { color: var(--warn); }
+
+/* Content area */
+.content { flex: 1; display: flex; overflow: hidden; }
+
+/* File Grid */
+.file-grid-area { flex: 1; padding: 20px 24px; overflow-y: auto; }
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.file-card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 14px; cursor: pointer; border: 1px solid var(--border);
+  transition: all 0.2s; position: relative;
+}
+.file-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.file-card .icon { font-size: 32px; margin-bottom: 8px; }
+.file-card .name {
+  font-size: 12px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.file-card .meta {
+  font-size: 10px; color: var(--text2); margin-top: 4px;
+}
+.file-card .size { font-size: 10px; color: var(--text2); }
+.file-card .views {
+  position: absolute; top: 8px; right: 10px;
+  font-size: 10px; color: var(--text2);
+}
+.starred::after {
+  content: '⭐'; position: absolute; top: 4px; left: 8px; font-size: 12px;
+}
+
+/* Preview Panel */
+.preview {
+  width: 420px; background: var(--surface);
+  border-left: 1px solid var(--border); padding: 20px;
+  overflow-y: auto; flex-shrink: 0; display: none;
+}
+.preview.open { display: block; }
+.preview h3 { font-size: 15px; margin-bottom: 12px; color: var(--accent); }
+.preview img, .preview video, .preview audio {
+  max-width: 100%; border-radius: 8px; margin-bottom: 12px;
+}
+.preview .info-table { font-size: 12px; }
+.preview .info-table div {
+  display: flex; justify-content: space-between;
+  padding: 6px 0; border-bottom: 1px solid var(--border);
+}
+.preview .info-table .key { color: var(--text2); }
+.preview .text-preview {
+  background: var(--surface2); padding: 12px; border-radius: 8px;
+  font-size: 12px; max-height: 400px; overflow-y: auto;
+  white-space: pre-wrap; font-family: monospace;
+}
+
+/* Right Panel */
+.right-panel {
+  width: 320px; background: var(--surface);
+  border-left: 1px solid var(--border); padding: 20px;
+  overflow-y: auto; flex-shrink: 0;
+}
+.right-panel h3 { font-size: 14px; color: var(--accent); margin-bottom: 12px; }
+.rec-item {
+  padding: 10px 12px; background: var(--surface2);
+  border-radius: 8px; margin-bottom: 8px; font-size: 12px;
+  border-left: 3px solid var(--accent2); cursor: pointer;
+}
+.rec-item.overdue { border-left-color: var(--danger); }
+.rec-item .reason { color: var(--text2); font-size: 11px; margin-top: 4px; }
+
+/* Loading */
+.loading {
+  text-align: center; padding: 40px; color: var(--text2);
+}
+.spinner {
+  display: inline-block; width: 24px; height: 24px;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* No results */
+.empty {
+  text-align: center; padding: 60px; color: var(--text2);
+}
+.empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+/* Category chart */
+.chart-bar {
+  height: 8px; background: var(--surface2); border-radius: 4px;
+  margin-bottom: 8px; overflow: hidden;
+}
+.chart-fill {
+  height: 100%; background: var(--accent); border-radius: 4px;
+  transition: width 0.5s;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .preview, .right-panel { display: none; }
+  .file-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>📊 FileVault</h2>
+      <button class="logout-btn" onclick="logout()" title="退出登录">退出</button>
+    </div>
+    <input class="search-box" type="text" placeholder="🔍 搜索文件..." id="searchInput" oninput="doSearch(this.value)">
+    <div id="categoryList"></div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card"><div class="label">总文件数</div><div class="value accent" id="statTotal">-</div></div>
+      <div class="stat-card"><div class="label">存储空间</div><div class="value green" id="statSize">-</div></div>
+      <div class="stat-card"><div class="label">待分类</div><div class="value warn" id="statInbox">-</div></div>
+      <div class="stat-card"><div class="label">今日推荐</div><div class="value accent" id="statRec">-</div></div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- File Grid -->
+      <div class="file-grid-area">
+        <div class="file-grid" id="fileGrid">
+          <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+        </div>
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="preview" id="previewPanel">
+        <div id="previewContent">
+          <div style="color:var(--text2);text-align:center;padding:40px;">
+            👈 点击文件预览
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Recommendations -->
+      <div class="right-panel">
+        <h3>🌟 每日推荐</h3>
+        <div id="recommendations"><div class="loading"><div class="spinner"></div></div></div>
+
+        <h3 style="margin-top:20px;">📈 分类分布</h3>
+        <div id="categoryChart"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Security utilities ─────────────────────
+let csrfToken = sessionStorage.getItem('csrf_token') || '';
+
+/** Safe HTML escaping using textContent */
+function esc(str) {
+  if (!str && str !== 0) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+/** Safe URL encoding */
+function enc(str) {
+  return encodeURIComponent(String(str || ''));
+}
+
+// ─── Auth check ─────────────────────────────
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/status');
+    const data = await r.json();
+    if (!data.authenticated) {
+      window.location.href = '/login';
+      return false;
+    }
+    // Refresh CSRF token
+    const csrfR = await fetch('/api/csrf_token');
+    if (csrfR.ok) {
+      const csrfD = await csrfR.json();
+      csrfToken = csrfD.csrf_token || '';
+      sessionStorage.setItem('csrf_token', csrfToken);
+    }
+    return true;
+  } catch(e) {
+    window.location.href = '/login';
+    return false;
+  }
+}
+
+async function logout() {
+  await fetch('/api/logout');
+  sessionStorage.removeItem('csrf_token');
+  window.location.href = '/login';
+}
+
+// ─── API helpers with CSRF ──────────────────
+async function fetchJSON(url, options = {}) {
+  const headers = { ...options.headers };
+  if (options.method && options.method !== 'GET') {
+    headers['X-CSRF-Token'] = csrfToken;
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  }
+  const r = await fetch(url, { ...options, headers });
+  if (r.status === 401) {
+    const data = await r.json().catch(() => ({}));
+    if (data.require_login) {
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+  }
+  return r.json();
+}
+
+// ─── State ──────────────────────────────────
+let currentCategory = '';
+let allStats = null;
+
+// ─── Init ───────────────────────────────────
+async function init() {
+  if (!await checkAuth()) return;
+  await loadStats();
+  await loadCategories();
+  await loadRecommendations();
+  loadFiles();
+}
+
+// ─── Stats ──────────────────────────────────
+async function loadStats() {
+  const s = await fetchJSON('/api/stats');
+  allStats = s;
+  document.getElementById('statTotal').textContent = String(s.total_files || 0);
+  document.getElementById('statInbox').textContent = String(s.inbox_count || 0);
+  const mb = ((s.total_size_bytes || 0) / 1024 / 1024).toFixed(1);
+  document.getElementById('statSize').textContent = mb + ' MB';
+
+  // Category chart — safe rendering with esc()
+  const chart = document.getElementById('categoryChart');
+  const byCat = s.by_category || {};
+  const entries = Object.entries(byCat)
+    .filter(([k]) => k !== '_inbox' && k !== '_archive')
+    .sort((a, b) => (b[1].count || 0) - (a[1].count || 0));
+
+  if (!entries.length) {
+    chart.textContent = '';
+    return;
+  }
+
+  const maxCount = Math.max(1, ...entries.map(([, data]) => data.count || 0));
+  chart.innerHTML = entries.map(([cat, data]) => {
+    const pct = ((data.count || 0) / maxCount * 100).toFixed(0);
+    return '<div style="font-size:11px;margin-bottom:2px;">' + esc(cat) +
+      ' <span style="color:var(--text2)">' + esc(data.count || 0) + '</span></div>' +
+      '<div class="chart-bar"><div class="chart-fill" style="width:' + pct + '%"></div></div>';
+  }).join('');
+}
+
+// ─── Categories ─────────────────────────────
+async function loadCategories() {
+  const cats = await fetchJSON('/api/categories');
+  const stats = allStats?.by_category || {};
+  const items = ['_inbox', ...Object.keys(cats || {}), '_archive'];
+  const emoji = { '_inbox': '📥', '_archive': '🗄️', '学习': '📚', '备忘': '📝', '提醒': '⏰', '生活': '🏠', '任务': '📋', '财务': '💰', '职务': '💼' };
+
+  const list = document.getElementById('categoryList');
+  // Safe: use textContent on individual elements via building with esc()
+  list.innerHTML = items.map(cat => {
+    const count = (stats[cat]?.count) || 0;
+    const activeClass = cat === currentCategory ? ' active' : '';
+    return '<div class="cat-item' + activeClass + '" data-cat="' + esc(cat) + '">' +
+      '<span>' + esc((emoji[cat] || '📁') + ' ' + cat) + '</span>' +
+      '<span class="count">' + esc(count) + '</span>' +
+    '</div>';
+  }).join('');
+
+  // Add click handlers after innerHTML (safe because we use data-cat attribute)
+  list.querySelectorAll('.cat-item').forEach(el => {
+    el.addEventListener('click', function() {
+      selectCategory(this.getAttribute('data-cat'));
+    });
+  });
+}
+
+// ─── File listing ───────────────────────────
+async function loadFiles() {
+  const url = currentCategory ? '/api/vault_files?category=' + enc(currentCategory) : '/api/vault_files';
+  const files = await fetchJSON(url);
+
+  const extIcon = {
+    '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️', '.gif': '🖼️', '.webp': '🖼️',
+    '.mp4': '🎬', '.webm': '🎬', '.mov': '🎬',
+    '.mp3': '🎵', '.wav': '🎵', '.ogg': '🎵',
+    '.pdf': '📕', '.docx': '📄', '.pptx': '📊',
+    '.txt': '📃', '.md': '📝', '.csv': '📊', '.json': '📋',
+    '.py': '🐍', '.js': '📜', '.html': '🌐', '.ipynb': '📓',
+  };
+
+  const grid = document.getElementById('fileGrid');
+  if (!files.length) {
+    grid.innerHTML = '<div class="empty"><div class="icon">📭</div><div>暂无文件</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">将文件放入 ~/FileVault/ 即可自动显示</div></div>';
+    return;
+  }
+
+  grid.innerHTML = files.map(f => {
+    const ext = (f.extension || '').toLowerCase();
+    const icon = extIcon[ext] || '📎';
+    const name = f.name || '';
+    const path = f.path || '';
+    const size = f.size;
+    const isImg = f.is_image ? 'true' : 'false';
+    const isVid = f.is_video ? 'true' : 'false';
+    const isAud = f.is_audio ? 'true' : 'false';
+    const isTxt = f.is_text ? 'true' : 'false';
+    const isPdf = (f.is_pdf ? 'true' : 'false');
+    const sizeStr = size > 1024*1024 ? (size/1024/1024).toFixed(1)+'MB' : size > 1024 ? (size/1024).toFixed(0)+'KB' : size+'B';
+
+    // Use data attributes to store values, then attach handlers
+    return '<div class="file-card" data-path="' + esc(path) + '" data-name="' + esc(name) +
+      '" data-size="' + esc(size) + '" data-is-img="' + isImg + '" data-is-vid="' + isVid +
+      '" data-is-aud="' + isAud + '" data-is-txt="' + isTxt + '" data-is-pdf="' + isPdf + '">' +
+      '<div class="icon">' + icon + '</div>' +
+      '<div class="name" title="' + esc(name) + '">' + esc(name) + '</div>' +
+      '<div class="meta">' + esc(sizeStr) + '</div>' +
+    '</div>';
+  }).join('');
+
+  // Attach click handlers via event delegation (safer than inline onclick)
+  grid.querySelectorAll('.file-card').forEach(card => {
+    card.addEventListener('click', function() {
+      previewFile(
+        this.getAttribute('data-path'),
+        this.getAttribute('data-name'),
+        parseInt(this.getAttribute('data-size')) || 0,
+        this.getAttribute('data-is-img'),
+        this.getAttribute('data-is-vid'),
+        this.getAttribute('data-is-aud'),
+        this.getAttribute('data-is-txt'),
+        this.getAttribute('data-is-pdf')
+      );
+    });
+  });
+}
+
+// ─── Search ─────────────────────────────────
+function doSearch(query) {
+  if (!query) { loadFiles(); return; }
+  fetchJSON('/api/search?q=' + enc(query)).then(results => {
+    const extIcon = { '.jpg':'🖼️','.jpeg':'🖼️','.png':'🖼️','.gif':'🖼️','.webp':'🖼️','.mp4':'🎬','.webm':'🎬','.mov':'🎬','.mp3':'🎵','.wav':'🎵','.ogg':'🎵','.pdf':'📕','.docx':'📄','.pptx':'📊','.txt':'📃','.md':'📝' };
+    const grid = document.getElementById('fileGrid');
+    if (!results.length) {
+      grid.innerHTML = '<div class="empty"><div class="icon">🔍</div><div>无匹配结果</div></div>';
+      return;
+    }
+    grid.innerHTML = results.map(f => {
+      const ext = (f.file_type || '').toLowerCase();
+      const icon = extIcon[ext] || '📎';
+      const path = f.path || '';
+      const name = f.original_name || (path ? path.split('/').pop() : '');
+      return '<div class="file-card" data-path="' + esc(path) + '" data-name="' + esc(name) +
+        '" data-size="0" data-is-img="false" data-is-vid="false" data-is-aud="false" data-is-txt="false" data-is-pdf="false">' +
+        '<div class="icon">' + icon + '</div>' +
+        '<div class="name" title="' + esc(name) + '">' + esc(name) + '</div>' +
+        '<div class="meta">' + esc(f.category || '') + ' · 查看' + esc(f.view_count || 0) + '次</div>' +
+      '</div>';
+    }).join('');
+    grid.querySelectorAll('.file-card').forEach(card => {
+      card.addEventListener('click', function() {
+        previewFile(this.getAttribute('data-path'), this.getAttribute('data-name'), 0, 'false', 'false', 'false', 'false', 'false');
+      });
+    });
+  });
+}
+
+// ─── Category filter ────────────────────────
+function selectCategory(cat) {
+  currentCategory = cat;
+  document.querySelectorAll('.cat-item').forEach(el => el.classList.remove('active'));
+  const el = document.querySelector('.cat-item[data-cat="' + esc(cat) + '"]');
+  if (el) el.classList.add('active');
+  loadFiles();
+}
+
+// ─── Preview ────────────────────────────────
+async function previewFile(path, name, size, isImg, isVid, isAud, isTxt, isPdf) {
+  const panel = document.getElementById('previewPanel');
+  const content = document.getElementById('previewContent');
+  panel.classList.add('open');
+
+  const sizeStr = size > 1024*1024 ? (size/1024/1024).toFixed(1)+'MB' : size > 1024 ? (size/1024).toFixed(0)+'KB' : size+'B';
+
+  // Record view (don't await to avoid blocking)
+  fetch('/api/file/view?path=' + enc(path));
+
+  // Build preview safely
+  let html = '<h3>' + esc(name) + '</h3>';
+
+  if (isImg === 'true') {
+    html += '<img src="/api/file/view?path=' + enc(path) + '" alt="' + esc(name) + '" style="max-width:100%;border-radius:8px;">';
+  } else if (isVid === 'true') {
+    html += '<video controls style="max-width:100%;border-radius:8px;" src="/api/file/view?path=' + enc(path) + '"></video>';
+  } else if (isAud === 'true') {
+    html += '<audio controls style="width:100%;" src="/api/file/view?path=' + enc(path) + '"></audio>';
+  } else if (isTxt === 'true' || isPdf === 'true') {
+    try {
+      const r = await fetch('/api/file/view?path=' + enc(path));
+      if (!r.ok) throw new Error('Failed');
+      const text = await r.text();
+      const truncated = text.substring(0, 10000);
+      const notice = text.length > 10000 ? '\n\n... (截断至前10000字符)' : '';
+      html += '<div class="text-preview">' + esc(truncated) + esc(notice) + '</div>';
+    } catch(e) {
+      html += '<div style="color:var(--text2)">无法预览此文件</div>';
+    }
+  } else {
+    html += '<div style="text-align:center;padding:40px;color:var(--text2);">' +
+      '<div style="font-size:48px;margin-bottom:12px;">📎</div>' +
+      '<div>' + esc(name) + '</div>' +
+      '<div style="font-size:12px;margin-top:8px;">' + esc(sizeStr) + '</div>' +
+    '</div>';
+  }
+
+  html += '<div class="info-table" style="margin-top:16px;">' +
+    '<div><span class="key">文件名</span><span>' + esc(name) + '</span></div>' +
+    '<div><span class="key">大小</span><span>' + esc(sizeStr) + '</span></div>' +
+    '<div><span class="key">路径</span><span style="font-size:10px;">' + esc(path) + '</span></div>' +
+  '</div>';
+
+  content.innerHTML = html;
+}
+
+// ─── Recommendations ────────────────────────
+async function loadRecommendations() {
+  const recs = await fetchJSON('/api/recommendations?limit=5');
+  const container = document.getElementById('recommendations');
+
+  document.getElementById('statRec').textContent =
+    String((recs.important?.length || 0) + (recs.discovery?.length || 0));
+
+  let html = '';
+
+  if (recs.important?.length) {
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">⭐ 重要文件</div>';
+    html += recs.important.map(r => {
+      const name = r.name || (r.path ? r.path.split('/').pop() : '');
+      return '<div class="rec-item" data-path="' + esc(r.path || '') + '" data-name="' + esc(name) + '">' +
+        '<div>' + esc(name) + '</div>' +
+        '<div class="reason">重要性: ' + esc((r.importance||0).toFixed(1)) + ' · ' + esc(r.category||'') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  if (recs.discovery?.length) {
+    html += '<div style="font-size:11px;color:var(--text2);margin:12px 0 8px;">🔍 发现</div>';
+    html += recs.discovery.map(r => {
+      const name = r.name || (r.path ? r.path.split('/').pop() : '');
+      return '<div class="rec-item" data-path="' + esc(r.path || '') + '" data-name="' + esc(name) + '">' +
+        '<div>' + esc(name) + '</div>' +
+        '<div class="reason">从未查看 · ' + esc(r.category||'') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  if (recs.overdue?.length) {
+    html += '<div style="font-size:11px;color:var(--text2);margin:12px 0 8px;">⚠️ 过期提醒</div>';
+    html += recs.overdue.map(r => {
+      const name = r.name || (r.path ? r.path.split('/').pop() : '');
+      return '<div class="rec-item overdue" data-path="' + esc(r.path || '') + '" data-name="' + esc(name) + '">' +
+        '<div>' + esc(name) + '</div>' +
+        '<div class="reason">上次访问: ' + esc(r.last_accessed||'未知') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  if (!html) {
+    html = '<div style="color:var(--text2);font-size:12px;">暂无推荐，添加更多文件吧~</div>';
+  }
+
+  container.innerHTML = html;
+
+  // Attach click handlers to recommendation items
+  container.querySelectorAll('.rec-item').forEach(item => {
+    item.addEventListener('click', function() {
+      previewFile(
+        this.getAttribute('data-path'),
+        this.getAttribute('data-name'),
+        0, 'false', 'false', 'false', 'false', 'false'
+      );
+    });
+  });
+}
+
+// ─── Start ──────────────────────────────────
+init();
+</script>
+</body>
+</html>
