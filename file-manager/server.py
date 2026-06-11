@@ -19,6 +19,7 @@ from classify import (
     update_category, delete_category, add_keywords, get_keywords, remove_keyword,
     record_correction, get_learning_stats, suggest_categories,
 )
+from redact import redact_text as redact_text_fn
 from organize import (
     ensure_vault, organize_file, archive_cleanup,
     search_files, get_stats, get_recommendations,
@@ -26,6 +27,7 @@ from organize import (
     record_correction_wrapper, get_learning_stats_wrapper, suggest_categories_wrapper,
     detect_file_groups, group_files, ungroup_files,
     describe, search_descriptions, list_descriptions, delete_description,
+    ingest_sensitive,
 )
 
 # MCP server (uses mcp package)
@@ -399,6 +401,30 @@ async def list_tools() -> list[Tool]:
                 "required": ["path"]
             }
         ),
+        # ── Sensitive File Security (v2.4) ──
+        Tool(
+            name="ingest_sensitive",
+            description="Process a sensitive file (ID cards, passports, NDAs). Detects PII locally, generates a redacted description that is safe to store and search. The original file content NEVER enters any database or cloud API. Use this instead of regular ingest_file when the file contains personal data.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "filepath": {"type": "string", "description": "Path to the sensitive file"},
+                    "ocr_text": {"type": "string", "description": "Pre-extracted text (from Telegram description, local OCR, or manual input). The raw text will be redacted before storage."}
+                },
+                "required": ["filepath"]
+            }
+        ),
+        Tool(
+            name="redact_text",
+            description="Detect and redact personally identifiable information (PII) from text. Runs 100% locally — text is never sent to any cloud API. Returns redacted version and list of findings. Supports Chinese ID cards, passports, phone numbers, emails, addresses, student IDs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to scan for PII and redact"}
+                },
+                "required": ["text"]
+            }
+        ),
     ]
 
 
@@ -553,6 +579,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         elif name == "delete_description":
             result = delete_description(arguments["path"])
+
+        # ── Sensitive File Security (v2.4) ──
+        elif name == "ingest_sensitive":
+            result = ingest_sensitive(
+                filepath=arguments["filepath"],
+                ocr_text=arguments.get("ocr_text", "")
+            )
+
+        elif name == "redact_text":
+            result = redact_text_fn(arguments["text"])
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]

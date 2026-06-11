@@ -16,13 +16,15 @@ VAULT_ROOT = Path.home() / "FileVault"
 META_DB = VAULT_ROOT / ".meta.db"
 
 CATEGORY_DIRS = ["学习", "备忘", "提醒", "生活", "任务", "财务", "职务"]
+SENSITIVE_DIRS = ["_sensitive"]  # security-isolated directories
 
 
 def ensure_vault() -> dict:
     """Create vault directory structure if it doesn't exist."""
     created = []
     for d in [VAULT_ROOT, VAULT_ROOT / "_inbox", VAULT_ROOT / "_archive"] + \
-             [VAULT_ROOT / c for c in CATEGORY_DIRS]:
+             [VAULT_ROOT / c for c in CATEGORY_DIRS] + \
+             [VAULT_ROOT / c for c in SENSITIVE_DIRS]:
         if not d.exists():
             d.mkdir(parents=True, exist_ok=True)
             created.append(str(d))
@@ -369,7 +371,62 @@ def toggle_star(filepath: str) -> dict:
     return {"error": "File not found in metadata"}
 
 
-# ─── Learning engine integration ──────────────────────────────────────
+# ─── Sensitive File Pipeline ─────────────────────────────────────────
+
+def ingest_sensitive(filepath: str, ocr_text: str = "") -> dict:
+    """
+    Process a sensitive file: detect PII, generate redacted description.
+    The original file content NEVER enters the database — only redacted metadata.
+    
+    Args:
+        filepath: Path to the sensitive file
+        ocr_text: Pre-extracted text (from Telegram description or local OCR).
+                   If empty, only filename-based hints are used.
+    
+    Returns:
+        {redacted_text, pii_findings, safe_description, has_pii, filepath}
+    """
+    from redact import redact_text, describe_sensitive_file
+    
+    if ocr_text:
+        result = redact_text(ocr_text)
+        safe_desc = describe_sensitive_file(ocr_text, filepath)
+    else:
+        result = {"redacted_text": "", "findings": [], "pii_count": 0, "has_pii": False, "safe_description": ""}
+        safe_desc = describe_sensitive_file("", filepath)
+    
+    # Write redacted description to DB
+    _set_description(filepath, safe_desc)
+    
+    # Store redacted metadata (no raw text)
+    _upsert_meta(
+        path=filepath,
+        category="_sensitive",
+        extracted_text=result["redacted_text"][:500] if result["redacted_text"] else "",
+        keywords=json.dumps([f["type"] for f in result["findings"]]),
+    )
+    
+    return {
+        "filepath": filepath,
+        "redacted_text": result["redacted_text"][:200],
+        "pii_findings": [{"type": f["type"], "redacted": f["redacted"]} for f in result["findings"]],
+        "pii_count": result["pii_count"],
+        "safe_description": safe_desc,
+        "has_pii": result["has_pii"],
+    }
+
+
+def _set_description(path: str, description: str):
+    """Write a description to the descriptions table."""
+    import os
+    conn = sqlite3.connect(str(META_DB))
+    conn.execute("""
+        INSERT INTO descriptions (path, description, updated_at) 
+        VALUES (?, ?, datetime('now'))
+        ON CONFLICT(path) DO UPDATE SET description=excluded.description, updated_at=datetime('now')
+    """, (os.path.abspath(path), description))
+    conn.commit()
+    conn.close()
 
 def _get_file_category(filepath: str) -> str | None:
     """Get the stored category for a file from metadata."""
